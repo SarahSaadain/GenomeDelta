@@ -50,7 +50,10 @@ with open(args.output+".def", 'r') as input, open(args.output, 'w') as output:
         for line in input:
             if line[0] == ">":
                 continue
-            elif line[base] == "A":
+
+            line = line.strip().upper()
+
+            if line[base] == "A":
                 count[0]+=1
             elif line[base] == "T":
                 count[1]+=1
@@ -60,6 +63,7 @@ with open(args.output+".def", 'r') as input, open(args.output, 'w') as output:
                 count[3]+=1
             elif line[base] == "-":
                 count[4]+=1
+                
         if max(count) == count[0]:
             letter = "A"
             output.write("A")
