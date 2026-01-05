@@ -1,17 +1,15 @@
-name: GenomeDelta
+name: GenomeDelta_SarahMod
 channels:
   - bioconda
   - conda-forge
-  - r
-  - defaults
 dependencies:
-  - python=3.9.18
-  - samtools=1.17
-  - bedtools=2.30.0
-  - bwa=0.7.17
+  - python=3.11
+  - samtools
+  - bedtools
+  - bwa
   - blast
-  - muscle
+  - mafft
   - ncurses
-  - r=4.1
-  - r-tidyverse
-  - r-argparse
+  - r-base=4.3
+  - r-tidyverse>=2.0
+  - r-argparse>=2.2
