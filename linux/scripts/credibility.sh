@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Check if correct number of arguments is provided
 if [ "$#" -ne 6 ]; then
@@ -18,10 +19,13 @@ prefix="$6"
 filename="$prefix"
 
 # Function to generate genome file from FASTA assembly
-samtools view -H "$bam" | awk '/^@SQ/ {print $2 "\t" $3}' | sed 's/SN://; s/LN://' > "$output_folder/${filename}.fai"
+if [[ ! -f "${fasta_genome}.fai" ]]; then
+    samtools faidx "$fasta_genome"
+fi
+cut -f1,2 "${fasta_genome}.fai" > "$output_folder/${filename}.fai"
 
 # Slop 10,000 nucleotides before the regions
-bedtools flank -i "$output_folder/${filename}-GD.bed" -g "$output_folder/${filename}.fai" -b 10000 |
+bedtools flank -i "$bed" -g "$output_folder/${filename}.fai" -b 10000 |
 awk -F'\t' -v OFS='\t' '{$2 = ($2 == 0 ? 1 : $2); print}' |
 bedtools sort -faidx "$output_folder/${filename}.fai" -i - > "$output_folder/${filename}-flanking.bed"
 

@@ -6,10 +6,11 @@ dependencies:
   - python=3.11
   - samtools
   - bedtools
-  - bwa
+  - bwa-mem2
   - blast
   - mafft
   - ncurses
   - r-base=4.3
   - r-tidyverse>=2.0
   - r-argparse>=2.2
+  - pytest # only needed to run the test suite in tests/

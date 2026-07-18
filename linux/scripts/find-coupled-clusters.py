@@ -48,6 +48,8 @@ def find_matches(cluster1, cluster2):
                                 coupled_list.append(coupled)
                                 matches+=1
                 cluster2.seek(0)
+    if sequences == 0:
+        return 0, coupled_list
     matches_frequency = (matches/sequences)*100
     return matches_frequency, coupled_list
 

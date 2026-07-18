@@ -27,7 +27,7 @@ installation.
 
 Index the fasta file.
 
-    bwa index test-assembly.fasta
+    bwa-mem2 index test-assembly.fasta
 
 Call GenomeDelta using our input files. Please specify:
 

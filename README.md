@@ -1,6 +1,21 @@
 GenomeDelta - Manual
 ================
 
+## About this fork
+
+This is a **Linux-only fork** of [rpianezza/GenomeDelta](https://github.com/rpianezza/GenomeDelta), maintained by [SarahSaadain](https://github.com/SarahSaadain). Compared to upstream, it includes:
+
+- **Linux only** — the macOS launcher and setup scripts/conda environment have been removed; all fixes below apply to `linux/`.
+- **Conda installer script** — `linux/install.sh` installs all dependencies into the active conda environment and registers a `GenomeDelta` command, so you no longer have to call `main.sh` with an explicit path.
+- **bwa-mem2 instead of bwa**, and **MAFFT instead of MUSCLE** for the multiple sequence alignment step (MUSCLE could segfault on large inputs).
+- **Resumable runs** — the mapping, alignment and consensus steps now check for existing output files and skip work that has already been done, so a failed run can be restarted without redoing everything.
+- **Hardened bash scripts** — `set -euo pipefail` on all scripts, fixed several variable-assignment/quoting bugs, and Linux-compatible `md5sum` instead of macOS `md5`.
+- **Stricter error handling** — the pipeline now fails loudly instead of silently producing bad output on missing contigs, empty alignments, or empty consensus sequences.
+- **Faster `MSA2consensus.py`** — the consensus caller now loads the alignment into memory once instead of re-reading the file for every base.
+- **Test suite** — a `pytest` suite under `tests/` covers argument validation, credibility scoring, clustering and consensus generation (`pytest`, config in `pytest.ini`).
+
+See the [commit history](https://github.com/SarahSaadain/GenomeDelta/commits/main) for the full list of changes.
+
 ## Purpose of GenomeDelta
 
 **GenomeDelta** is a software designed to discover horizontal transfer
@@ -25,10 +40,41 @@ Modifications are only done for linux!
 
 ### Linux
 
-Download the GD repository using git clone, then create the conda
-environment using the `set-env.yml`.
+#### Prerequisite: conda
+
+GenomeDelta's dependencies are installed via conda, so you need a conda
+installation first. If you don't have one, install
+[Miniconda](https://docs.conda.io/en/latest/miniconda.html) (or
+[Miniforge](https://github.com/conda-forge/miniforge)):
+
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash Miniconda3-latest-Linux-x86_64.sh
+
+Follow the prompts, then restart your shell (or `source ~/.bashrc`) so the
+`conda` command is available.
+
+#### Install GenomeDelta itself
+
+Download the GD repository using git clone, then choose one of the two
+installation methods below.
+
+#### Option A: install script (recommended)
+
+Create and activate an empty conda environment, then run `linux/install.sh`
+to install all dependencies into it and register a `GenomeDelta` command:
+
+    conda create -n GenomeDelta
+    conda activate GenomeDelta
+    bash linux/install.sh
+
+#### Option B: conda environment file
+
+Create the conda environment directly from `set-env-linux.yml`:
 
     conda-env create -f linux/set-env-linux.yml
+
+With this option there is no `GenomeDelta` command; call `main.sh` directly
+(see below).
 
 ## Call GenomeDelta
 
@@ -36,16 +82,15 @@ Activate the conda environment:
 
     conda activate GenomeDelta
 
-When being into the GenomeDelta conda environment, to run the tool you
-can just type GenomeDelta (MacOS) or call the main script defining its
-path (if you followed a **manual installation** or you are on a Linux
-machine).
+If you installed with `linux/install.sh` (Option A), you can just type
+`GenomeDelta` from anywhere. Otherwise (Option B, or a manual installation),
+call the main script defining its path.
 
-Example call (MacOS):
+Example call (installed via `linux/install.sh`):
 
     GenomeDelta --fq reads.fastq.gz --fa assembly.fa --of folder_path --prefix name --t 20
 
-Example call (Linux or manual installation):
+Example call (conda environment file or manual installation):
 
     cd GenomeDelta/linux
     bash main.sh --fq reads.fastq.gz --fa assembly.fa --of folder_path --prefix name --t 20
@@ -63,7 +108,7 @@ The above call is composed of:
 
 Remember to index the FASTA assembly before the call!
 
-    bwa index assembly.fa
+    bwa-mem2 index assembly.fa
 
 GD can also accept sorted **BAM** files as input instead of the FASTQ
 file. The BAM file should have been mapped to the same FASTA assembly

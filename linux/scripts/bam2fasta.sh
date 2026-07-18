@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Check if correct number of arguments is provided
 if [ "$#" -ne 7 ]; then

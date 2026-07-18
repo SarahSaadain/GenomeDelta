@@ -75,7 +75,7 @@ Before running GenomeDelta on an assembly, the indexing of the fasta
 file is required.
 
 ``` shell
-bwa index assembly.fa
+bwa-mem2 index assembly.fa
 ```
 
 To run the software, the following command was used:

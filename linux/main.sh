@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Set default values for optional arguments
 d=100 # maximum distance accepted for a gap between 2 low coverage sequences
@@ -6,11 +7,14 @@ min_cov=1 # minimum coverage of a position to be considered NON low coverage (in
 min_len=1000 # minimum length for a low-coverage sequence to be included in the output
 min_bitscore=1000 # minimum bitscore in the BLAST alignment to consider the sequences part of the same cluster
 refine_d=2500 # maximum distance to check coupled-clusters (e.g. if the option "refine" is activated, the script will merge clusters if their insertions are closer than refine_d)
+refine_set=0
 prefix="file"
 
 remove_temp=0 # remove temporary files
 
 # Initialize variables
+fastq=""
+bam=""
 fastq_set=0
 bam_set=0
 
@@ -142,13 +146,13 @@ fi
 echo "Using filename for processing files: $filename"
 
 if [ ! -z "$fastq" ]; then
-    # Run BWA-MEM to map fastq to fasta
-    echo "Mapping $fastq to $assembly using BWA-MEM with ${thr} threads"
+    # Run BWA-MEM2 to map fastq to fasta
+    echo "Mapping $fastq to $assembly using BWA-MEM2 with ${thr} threads"
 
-    bam = "${mapped_folder}/${filename}.sorted.bam"
+    bam="${mapped_folder}/${filename}.sorted.bam"
 
     if [[ ! -f "${mapped_folder}/${filename}.sorted.bam" ]]; then
-        bwa mem -t "${thr}" "${assembly}" "${fastq}" | samtools view -bS -F 4 - | samtools sort -o "${bam}"
+        bwa-mem2 mem -t "${thr}" "${assembly}" "${fastq}" | samtools view -bS -F 4 - | samtools sort -o "${bam}"
     else
         echo "BAM file $bam already exists, skipping mapping."
     fi
@@ -259,7 +263,7 @@ fasta_count=$(ls "${mapped_folder}/${filename}-GD-clusters/"*.fasta | wc -l)
 
 echo "Found $fasta_count fasta files in the folder ${mapped_folder}/${filename}-GD-clusters."
 
-index = 0
+index=0
 
 # Loop through each fasta file in the folder
 for fasta in "${mapped_folder}/${filename}-GD-clusters/"*.fasta
@@ -286,7 +290,7 @@ do
     if [[ ! -f "$output_MSA" ]]; then
         # muscle might run into segmentation fault if the input file is too large, so we use MAFFT instead
         # muscle -align "${output_standard}.fasta" -output "$output_MSA" -threads "$thr"
-        mafft --thread "$thr" --auto "${output_standard}.fasta" > "$output_MSA"
+        mafft --thread "$thr" --auto "${output_standard}.fasta" > "$output_MSA" || true
     else
         echo "MAFFT output already exists for $fasta, skipping alignment."
         continue
@@ -295,20 +299,20 @@ do
     # checkl if the MSA file was created successfully or if it is empty
     if [[ ! -f "$output_MSA" ]]; then
         echo "Error: MSA file was not created successfully. Please check the input files and parameters."
-        rm "$output_MSA"
+        rm -f "$output_MSA"
         continue
     fi
 
     if [[ ! -s "$output_MSA" ]]; then
         echo "The file $output_MSA is empty. MUSCLE was not able to align the sequences."
-        rm "$output_MSA"
+        rm -f "$output_MSA"
         continue
     fi
 
     # Run MSA2consensus to get the consensus sequence if it does not exist
     if [[ ! -f "$output_consensus" ]]; then
         echo "Running MSA2consensus on $output_MSA"
-        python "$current_dir/scripts/MSA2consensus.py" "$output_MSA" "$output_consensus"
+        python "$current_dir/scripts/MSA2consensus.py" "$output_MSA" "$output_consensus" || true
     else
         echo "Consensus file already exists for $output_MSA, skipping MSA2consensus."
         continue
@@ -317,13 +321,13 @@ do
     # check if the consensus file was created successfully
     if [[ ! -f "$output_consensus" ]]; then
         echo "Error: Consensus file was not created successfully. Please check the input files and parameters."
-        rm "$output_consensus"
+        rm -f "$output_consensus"
         continue
     fi
 
     if [[ ! -s "$output_consensus" ]]; then
         echo "The file $output_consensus is empty. MSA2consensus was not able to extract the consensus sequence. Check if you prepared everything according to the Manual. Try to change the parameters to reduce stringency"
-        rm "$output_consensus"
+        rm -f "$output_consensus"
         continue
     fi
 
@@ -337,7 +341,7 @@ done
 if [[ "$refine_set" -eq 1 ]]; then
     echo "Refining..."
     mkdir "${mapped_folder}/${filename}-GD-clusters-refined"
-    bash "$current_dir/scripts/find-coupled-clusters.sh" "${mapped_folder}/${filename}-GD-clusters" "${mapped_folder}/${filename}-GD-clusters-refined" "${refine_d}" "${assembly}" "${bam}" "${mapped_folder}/${filename}.bedgraph"
+    bash "$current_dir/scripts/find-coupled-clusters.sh" "${mapped_folder}/${filename}-GD-clusters" "${mapped_folder}/${filename}-GD-clusters-refined" "${refine_d}" "${assembly}" "${bam}" "${mapped_folder}/${filename}.bedgraph" "${prefix}"
 fi
 
 mv "${mapped_folder}/${filename}-GD-credibility.bed" "${mapped_folder}/${filename}-GD.bed"

@@ -12,10 +12,14 @@ args = parser.parse_args()
 
 def find_flanking(chr, start, end, fai, bases):
     flanking = []
+    end_chr = None
     with open(fai, 'r') as fai_file:
         for line in fai_file:
             if chr == line.split('\t')[0]:
                 end_chr = int(line.split('\t')[1])
+                break
+    if end_chr is None:
+        raise ValueError(f"Contig '{chr}' not found in fai file: {fai}")
     if bases < 0:
         start_flank = start+int(bases)
         if start_flank <= 0:

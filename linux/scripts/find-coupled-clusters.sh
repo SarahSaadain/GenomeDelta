@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+shopt -s nullglob
 
 # Assign input arguments to variables
 fasta_folder="$1"
@@ -27,11 +29,11 @@ for fasta_file in "$fasta_folder"/*.fasta; do
 done
 
 # Create an associative array to store file hashes
-declare -afFirtx file_hashes
+declare -A file_hashes
 
 # Function to calculate MD5 hash of a file
 calculate_hash() {
-    md5 "$1" | awk '{print $1}'
+    md5sum "$1" | awk '{print $1}'
 }
 
 # Iterate over all files in the folder
@@ -65,8 +67,8 @@ for txt_file in "$output_folder"/*.txt; do
     awk -F '[:-]' '{print substr($1, 2) "\t" $2 "\t" $3}' "$txt_file" > "$bed_file"
 
     # Assign credibility to each sequence based on genomic context coverage
-    bash "$script_dir/credibility.sh" "$bed_file" "$bedgraph" "$input_bam" "$assembly" "$output_folder"
-    python "$script_dir/credibility.py" "$bed_file" "$output_folder/${filename_no_extension}-flanking.credibility" "$output_folder/${filename_no_extension}.fai"
+    bash "$script_dir/credibility.sh" "$bed_file" "$bedgraph" "$input_bam" "$assembly" "$output_folder" "$filename_no_extension"
+    python "$script_dir/credibility.py" "$bed_file" "$output_folder/${filename_no_extension}-GD-flanking.credibility" "$output_folder/${filename_no_extension}.fai"
     
     # Run bedtools getfasta for each BED file
     fasta_output="$output_folder/$filename_no_extension.fasta"
@@ -79,7 +81,7 @@ for txt_file in "$output_folder"/*.txt; do
     rm "$output_folder/$filename_no_extension.fasta-e"
     rm "$output_folder/$filename_no_extension-flanking.bed"
     rm "$output_folder/$filename_no_extension-credibility.bed"
-    rm "$output_folder/$filename_no_extension-flanking.credibility"
+    rm "$output_folder/$filename_no_extension-GD-flanking.credibility"
     rm "$output_folder/$filename_no_extension-flanking.bedgraph"
     rm "$output_folder/$filename_no_extension.bed"
     rm "$output_folder/$filename_no_extension.txt"
