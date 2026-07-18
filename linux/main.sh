@@ -18,10 +18,37 @@ bam=""
 fastq_set=0
 bam_set=0
 
+print_help() {
+    cat <<EOF
+Usage: $0 (--fq <fastq_file> | --bam <bam_file>) --fa <assembly> --of <mapped_folder> --t <threads> [options]
+
+Required arguments:
+  --fq <file>            Input FASTQ file (mutually exclusive with --bam)
+  --bam <file>           Input sorted BAM file (mutually exclusive with --fq)
+  --fa <file>            Reference assembly FASTA file
+  --of <folder>          Output/mapped folder (created if it does not exist)
+  --t <int>              Number of threads to use
+
+Optional arguments:
+  --d <int>              Maximum distance accepted for a gap between 2 low coverage sequences (default: ${d})
+  --min_cov <int>        Minimum coverage of a position to be considered non-low-coverage (default: ${min_cov})
+  --min_len <int>        Minimum length for a low-coverage sequence to be included in the output (default: ${min_len})
+  --min_bitscore <int>   Minimum BLAST bitscore to consider sequences part of the same cluster (default: ${min_bitscore})
+  --refine               Enable refinement step to merge nearby coupled clusters
+  --refine_d <int>       Maximum distance to check coupled clusters when --refine is set (default: ${refine_d})
+  --prefix <string>      Prefix used for output file names (default: ${prefix})
+  -h, --help             Show this help message and exit
+EOF
+}
+
 # Parse command line options
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --fq) 
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+        --fq)
             fastq="$2"; 
             fastq_set=1; 
             shift 
@@ -87,7 +114,7 @@ fi
 
 # Check if the correct number of arguments is provided
 if { [ -z "$fastq" ] && [ -z "$bam" ]; } || [ -z "$assembly" ] || [ -z "$mapped_folder" ] || [ -z "$thr" ]; then
-  echo "Usage: $0 (--fq <fastq_file> | --bam <bam_file>) --fa <assembly> --of <mapped_folder> --t <threads> [--d <value>] [--min_cov <value>]"
+  print_help
   exit 1
 fi
 
