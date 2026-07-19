@@ -143,9 +143,53 @@ or explore your findings:
 
 - `GD-candidates.fasta` -\> Consensus sequences of the repetitive
   clusters. Represents a list of candidates of the invading TEs. Each
-  sequence name is composed off: (i) cluster name, (ii) median
-  coverage bias of the sequences in the cluster, (iii) number of
+  sequence name is composed off: (i) cluster name, (ii) mean
+  credibility score of the sequences in the cluster, (iii) number of
   sequences in the cluster.
+
+### Credibility score
+
+Every candidate sequence (and, by extension, every consensus/cluster) is
+tagged with a **credibility score**, the number appended to its FASTA
+header, e.g. `..._-0.591`. It is computed in
+`linux/scripts/credibility.sh` and `linux/scripts/credibility.py`,
+*before* clustering:
+
+1. For each candidate low-coverage region, take the 10,000 bp flanking
+   it on the left and on the right, and compute the mean sequencing
+   read depth in each flank (`bedtools coverage -mean`).
+2. Compare that flank coverage to the mean coverage of the whole
+   genome:
+
+       score = 2 * (flank_coverage / (flank_coverage + genome_mean_coverage)) - 1
+
+   which is equivalent to `(flank_coverage - genome_mean_coverage) /
+   (flank_coverage + genome_mean_coverage)`.
+3. Average the left-flank and right-flank scores into a single
+   per-sequence credibility value.
+
+The score is bounded between **-1 and +1**:
+
+- **-1** -\> no reads at all map to the flanking region.
+- **0** -\> flank coverage matches the genome-wide average (typical,
+  expected depth).
+- **+1** -\> flank coverage is far above the genome-wide average (e.g.
+  a highly repetitive region where reads pile up).
+
+In short: **scores close to 0 mean the candidate sits in a normally
+covered part of the genome (more trustworthy)**; **strongly negative
+scores mean the flanking region is poorly covered relative to the rest
+of the genome**, which can happen in repetitive/hard-to-map regions
+(including genuine TE-rich regions) or simply in low-coverage
+sequencing data. It is a proxy for how well-supported the region
+around a candidate is, not a direct measure of whether the candidate
+is a true TE insertion.
+
+When sequences are grouped into a cluster, `MSA2consensus.py` averages
+their individual credibility scores into the cluster's mean
+credibility, which is the middle number in the consensus/cluster
+header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
+`-0.74` over `4` sequences).
 
 ### Secondary output files
 
@@ -173,9 +217,24 @@ or explore your findings:
 - `GD-clusters` -\> This folder contains, for each of the repetitive
   clusters found:
 
-  - a **FASTA** file containing all the sequences clustering together.
-  - the **consensus** sequence of the cluster, then concatenated with
-    the other consensus into the **GD-candidates.fasta** file.
+  - a **`.fasta`** file containing all the raw sequences clustering
+    together (before alignment).
+  - a **`.MSA`** file, the multiple sequence alignment (MAFFT) of
+    those sequences.
+  - a **`.consensus`** file, the consensus sequence built from the
+    MSA, then concatenated with the other consensus sequences into the
+    **GD-candidates.fasta** file.
+
+  The sequences clustered together often come from different genomic
+  loci and are not the same length, so MAFFT pads the shorter ones
+  with gap columns to line everything up. `MSA2consensus.py` builds
+  the consensus column-by-column by taking the most common base (or
+  gap) across the aligned sequences, so alignment columns where most
+  sequences in the cluster don't have any sequence yet (or have
+  already ended) come out as runs of `-` in the `.consensus` file.
+  This is expected and not an error: it simply marks the parts of the
+  alignment that aren't covered by a majority of the cluster's
+  sequences, rather than being real missing data in the genome.
 
 ## Tips & Tricks
 
@@ -281,6 +340,7 @@ have an impact on the quality of the results.
   contaminations from other organisms). The quality of the long read
   assembly is thus crucial for a smooth **GenomeDelta** run.
 
-In general, **clusters with low coverage bias (close to 0), with a
+In general, **clusters with a credibility score close to 0, with a
 long consensus sequence and composed by many sequences are likely to be
-more valuable.**
+more valuable.** See [Credibility score](#credibility-score) above for
+what this number means.
