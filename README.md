@@ -116,6 +116,47 @@ specified in the call and sorted with samtools.
 
     GenomeDelta --bam mapped.sorted.bam --fa assembly.fa --of folder_path --prefix name --t 20
 
+## Pipeline steps
+
+**GenomeDelta** (`linux/main.sh`) runs the following steps **in order**. Each
+step is skipped if its output file(s) already exist, so an interrupted run
+can be resumed by calling the same command again.
+
+1. **Read mapping** (`bwa-mem2 mem` \| `samtools view` \| `samtools sort`) —
+   only if `--fq` was given; skipped entirely if `--bam` was given.
+   **Multithreaded** (`-t $thr` on `bwa-mem2`).
+2. **BAM indexing** (`samtools index`) — single-threaded.
+3. **Coverage-gap extraction** (`scripts/bam2fasta.sh`) — computes per-base
+   depth, merges low-coverage intervals, filters by `--min_cov`/`--min_len`/
+   `--d`, scores each region with the [credibility score](#credibility-score)
+   (`scripts/credibility.sh` + `credibility.py`), then extracts the
+   sequences into `GD.fasta`. Single-threaded.
+4. **Self-BLAST** (`blastn`) of `GD.fasta` against itself to find repetitive
+   sequences → `GD.blast`. Single-threaded.
+5. **Clustering** (`scripts/blast2clusters.py`) — groups the BLAST hits into
+   repetitive clusters (one `.fasta` file per cluster in `GD-clusters/`) and
+   separates out `GD-non_rep.fasta`. Single-threaded.
+6. **Per-cluster alignment + consensus** — loops over every cluster
+   `.fasta` file **one at a time** (not in parallel with each other):
+   - `mafft --thread $thr --auto` → `.MSA`. **Multithreaded** for each
+     individual alignment, but the next cluster only starts once the
+     current one's alignment *and* consensus step have finished.
+   - `scripts/MSA2consensus.py` → `.consensus`. Single-threaded.
+7. **Optional refinement** (`--refine`, `scripts/find-coupled-clusters.sh`)
+   — merges clusters whose insertions are within `--refine_d` of each
+   other, then re-scores/re-aligns them with `muscle` (single-threaded,
+   no thread flag). Entirely single-threaded.
+8. **Concatenation** of all `.consensus` files into `GD-candidates.fasta`.
+9. **Indexing** (`samtools faidx`) of the candidates and non-repetitive
+   FASTA files — single-threaded.
+10. **Visualization** (`Rscript visualization.R`) — generates
+    `GD-candidates.png` and `GD-non_rep.png`. Single-threaded.
+
+In short: `--t` only speeds up read mapping (step 1) and, per cluster, the
+MAFFT alignment (step 6) — everything else (BLAST, bedtools, samtools,
+Python scripts, the refinement step) runs on a single core, and clusters
+are aligned sequentially rather than in parallel with each other.
+
 ## Optional arguments
 
 **GenomeDelta** also has some other options, that can be used to refine
