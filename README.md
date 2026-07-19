@@ -8,10 +8,11 @@ This is a **Linux-only fork** of [rpianezza/GenomeDelta](https://github.com/rpia
 - **Linux only** — the macOS launcher and setup scripts/conda environment have been removed; all fixes below apply to `linux/`.
 - **Conda installer script** — `linux/install.sh` installs all dependencies into the active conda environment and registers a `GenomeDelta` command, so you no longer have to call `main.sh` with an explicit path.
 - **bwa-mem2 instead of bwa**, and **MAFFT instead of MUSCLE** for the multiple sequence alignment step (MUSCLE could segfault on large inputs).
-- **Resumable runs** — the mapping, alignment and consensus steps now check for existing output files and skip work that has already been done, so a failed run can be restarted without redoing everything.
+- **Resumable runs** — the mapping, alignment and consensus steps now check for existing output files and skip work that has already been done, so a failed run can be restarted without redoing everything. Deleting just a cluster's `.consensus` file (keeping its `.MSA`) now correctly rebuilds only the consensus, instead of silently skipping that cluster.
 - **Hardened bash scripts** — `set -euo pipefail` on all scripts, fixed several variable-assignment/quoting bugs, and Linux-compatible `md5sum` instead of macOS `md5`.
 - **Stricter error handling** — the pipeline now fails loudly instead of silently producing bad output on missing contigs, empty alignments, or empty consensus sequences.
 - **Faster `MSA2consensus.py`** — the consensus caller now loads the alignment into memory once instead of re-reading the file for every base.
+- **Gap-free consensus sequences** — `MSA2consensus.py` now strips alignment-gap (`-`) columns out of `.consensus`/`GD-candidates.fasta`, since `-` isn't a valid nucleotide and inflated the reported consensus length; the gapped version is kept alongside as `.consensus.raw` for inspection.
 - **Test suite** — a `pytest` suite under `tests/` covers argument validation, credibility scoring, clustering and consensus generation (`pytest`, config in `pytest.ini`).
 
 See the [commit history](https://github.com/SarahSaadain/GenomeDelta/commits/main) for the full list of changes.
@@ -141,7 +142,8 @@ can be resumed by calling the same command again.
    - `mafft --thread $thr --auto` → `.MSA`. **Multithreaded** for each
      individual alignment, but the next cluster only starts once the
      current one's alignment *and* consensus step have finished.
-   - `scripts/MSA2consensus.py` → `.consensus`. Single-threaded.
+   - `scripts/MSA2consensus.py` → `.consensus` (gap-free) and
+     `.consensus.raw` (keeps the alignment's `-` gap columns). Single-threaded.
 7. **Optional refinement** (`--refine`, `scripts/find-coupled-clusters.sh`)
    — merges clusters whose insertions are within `--refine_d` of each
    other, then re-scores/re-aligns them with `muscle` (single-threaded,
@@ -265,6 +267,9 @@ header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
   - a **`.consensus`** file, the consensus sequence built from the
     MSA, then concatenated with the other consensus sequences into the
     **GD-candidates.fasta** file.
+  - a **`.consensus.raw`** file: the same consensus before gap columns
+    are stripped out (see below). Useful for inspecting the alignment
+    structure, but not used downstream.
 
   The sequences clustered together often come from different genomic
   loci and are not the same length, so MAFFT pads the shorter ones
@@ -272,10 +277,18 @@ header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
   the consensus column-by-column by taking the most common base (or
   gap) across the aligned sequences, so alignment columns where most
   sequences in the cluster don't have any sequence yet (or have
-  already ended) come out as runs of `-` in the `.consensus` file.
-  This is expected and not an error: it simply marks the parts of the
-  alignment that aren't covered by a majority of the cluster's
-  sequences, rather than being real missing data in the genome.
+  already ended) come out as `-` gaps. This is expected and not an
+  error: it simply marks the parts of the alignment that aren't
+  covered by a majority of the cluster's sequences, rather than being
+  real missing data in the genome.
+
+  These `-` gap columns are kept in `.consensus.raw`, but stripped out
+  of the final `.consensus` file (and therefore out of
+  `GD-candidates.fasta`): `-` isn't a valid nucleotide character, and
+  leaving it in would both break tools that consume the candidates
+  file downstream (BLAST, RepeatMasker, aligners, ...) and inflate the
+  "consensus length" reported by `samtools faidx`/`visualization.R`
+  with columns that don't represent any real sequence.
 
 ## Tips & Tricks
 

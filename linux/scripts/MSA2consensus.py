@@ -82,9 +82,22 @@ for base in range(sequence_length):
         else:
             consensus.append("-")
 
+header = ">" + input_basename + "_" + str(cluster_credibility) + "_" + str(n) + "\n"
+consensus_raw = ''.join(consensus)
+
+# Raw consensus keeps the gap columns ("-"), so the alignment structure
+# (which columns lack majority support) stays inspectable.
+with open(args.output + ".raw", 'w') as output_raw:
+    output_raw.write(header)
+    output_raw.write(consensus_raw)
+    output_raw.write("\n")
+
+# Final consensus drops gap columns: downstream consumers (GD-candidates.fasta,
+# BLAST, RepeatMasker, ...) expect a real, contiguous nucleotide sequence,
+# not alignment-gap characters.
 with open(args.output, 'w') as output:
-    output.write(">" + input_basename + "_" + str(cluster_credibility) + "_" + str(n) + "\n")
-    output.write(''.join(consensus))
+    output.write(header)
+    output.write(consensus_raw.replace("-", ""))
     output.write("\n")
 
 os.remove(args.output+".def")

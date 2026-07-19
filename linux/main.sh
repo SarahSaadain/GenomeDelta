@@ -311,18 +311,17 @@ do
         continue
     fi
 
-    echo "Running MAFFT on $fasta"
-
-    # Run MUSCLE with input and output files if they do not exist
+    # Run MAFFT with input and output files if the MSA does not exist yet;
+    # otherwise reuse it and fall through to (re)build the missing consensus.
     if [[ ! -f "$output_MSA" ]]; then
+        echo "Running MAFFT on $fasta"
         # muscle might run into segmentation fault if the input file is too large, so we use MAFFT instead
         # muscle -align "${output_standard}.fasta" -output "$output_MSA" -threads "$thr"
         mafft --thread "$thr" --auto "${output_standard}.fasta" > "$output_MSA" || true
     else
-        echo "MAFFT output already exists for $fasta, skipping alignment."
-        continue
+        echo "MAFFT output already exists for $fasta, reusing it to build the consensus."
     fi
-    
+
     # checkl if the MSA file was created successfully or if it is empty
     if [[ ! -f "$output_MSA" ]]; then
         echo "Error: MSA file was not created successfully. Please check the input files and parameters."
@@ -336,14 +335,11 @@ do
         continue
     fi
 
-    # Run MSA2consensus to get the consensus sequence if it does not exist
-    if [[ ! -f "$output_consensus" ]]; then
-        echo "Running MSA2consensus on $output_MSA"
-        python "$current_dir/scripts/MSA2consensus.py" "$output_MSA" "$output_consensus" || true
-    else
-        echo "Consensus file already exists for $output_MSA, skipping MSA2consensus."
-        continue
-    fi
+    # Run MSA2consensus to get the consensus sequence (we already skipped via
+    # the "continue" above if $output_consensus existed, so it's safe to run
+    # unconditionally here)
+    echo "Running MSA2consensus on $output_MSA"
+    python "$current_dir/scripts/MSA2consensus.py" "$output_MSA" "$output_consensus" || true
 
     # check if the consensus file was created successfully
     if [[ ! -f "$output_consensus" ]]; then

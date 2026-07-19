@@ -4,6 +4,11 @@ The script builds a majority-vote consensus sequence from an aligned MSA
 FASTA file and prefixes the output header with the output file's basename,
 the mean credibility score parsed off each input header, and the number
 of sequences.
+
+It writes two files: `<output>.raw`, which keeps the "-" gap columns so the
+alignment structure stays inspectable, and `<output>`, the final consensus
+with gap columns stripped out (this is the file concatenated into
+GD-candidates.fasta, so it must be real contiguous sequence).
 """
 
 
@@ -63,7 +68,7 @@ def test_lowercase_bases_are_upcased(tmp_path, run_script):
     assert seq == "ACGT"
 
 
-def test_column_with_a_majority_of_gaps_becomes_a_gap(tmp_path, run_script):
+def test_column_with_a_majority_of_gaps_becomes_a_gap_in_the_raw_file(tmp_path, run_script):
     msa = tmp_path / "gaps.MSA"
     # 3 sequences, single column: two gaps outvote one 'A'.
     msa.write_text(">a_1\n-\n>b_1\n-\n>c_1\nA\n")
@@ -72,8 +77,30 @@ def test_column_with_a_majority_of_gaps_becomes_a_gap(tmp_path, run_script):
     result = run_script("MSA2consensus.py", [msa, output])
 
     assert result.returncode == 0, result.stderr
+    _, raw_seq = read_fasta_record(output.with_name(output.name + ".raw"))
+    assert raw_seq == "-"
+    # the final consensus strips gap columns, so an all-gap column disappears
     _, seq = read_fasta_record(output)
-    assert seq == "-"
+    assert seq == ""
+
+
+def test_gap_columns_are_stripped_from_the_final_consensus(tmp_path, run_script):
+    msa = tmp_path / "strip.MSA"
+    # 3 sequences, 5 columns: a leading, a middle and a trailing gap-majority column.
+    msa.write_text(
+        ">a_1\n-ACG-\n"
+        ">b_1\n-ACG-\n"
+        ">c_1\nTA-GT\n"
+    )
+    output = tmp_path / "strip.consensus"
+
+    result = run_script("MSA2consensus.py", [msa, output])
+
+    assert result.returncode == 0, result.stderr
+    _, raw_seq = read_fasta_record(output.with_name(output.name + ".raw"))
+    assert raw_seq == "-ACG-"
+    _, seq = read_fasta_record(output)
+    assert seq == "ACG"
 
 
 def test_plurality_gaps_lose_to_combined_nucleotide_votes(tmp_path, run_script):
