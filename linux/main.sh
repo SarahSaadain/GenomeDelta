@@ -411,6 +411,18 @@ if [[ ! -s "${mapped_folder}/${filename}-GD-candidates.fasta" ]]; then
     exit 1
 fi
 
+echo "Generating candidates summary file ${mapped_folder}/${filename}-GD-candidates-summary.tsv"
+
+# List the cluster folders that fed into GD-candidates.fasta, so the summary
+# can recover each candidate's original genomic regions (that information is
+# in the pre-MSA cluster_N.fasta headers, but is lost in the consensus header).
+summary_cluster_folders=("${mapped_folder}/${filename}-GD-clusters")
+if [[ "$refine_set" -eq 1 ]]; then
+    summary_cluster_folders+=("${mapped_folder}/${filename}-GD-clusters-refined")
+fi
+
+python "$current_dir/scripts/summarize_candidates.py" "${summary_cluster_folders[@]}" "${mapped_folder}/${filename}-GD-candidates-summary.tsv"
+
 echo "Indexing candidates fasta file ${mapped_folder}/${filename}-GD-candidates.fasta"
 
 # create index for the candidates and non-rep fasta files if they do not exist
