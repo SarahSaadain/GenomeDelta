@@ -228,10 +228,11 @@ if [[ ! -s "${mapped_folder}/${filename}-GD.fasta" ]]; then
   exit 1
 fi
 
-echo "Running BLAST to find repetitive gaps in ${mapped_folder}/${filename}-GD.fasta"
-
 # Run blast if blast file does not exist
 if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
+
+    echo "Running BLAST to find repetitive gaps in ${mapped_folder}/${filename}-GD.fasta"
+
     blastn -query "${mapped_folder}/${filename}-GD.fasta" -subject "${mapped_folder}/${filename}-GD.fasta" -outfmt 6 | gzip > "${mapped_folder}/${filename}-GD.tmp.blast.gz"
     zcat "${mapped_folder}/${filename}-GD.tmp.blast.gz" | awk '($12) >= '"${min_bitscore}" | gzip > "${mapped_folder}/${filename}-GD.blast.gz"
 
@@ -241,15 +242,16 @@ if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
         rm "${mapped_folder}/${filename}-GD.tmp.blast.gz"
     fi
 
+    # check if the blast file was created successfully
+    if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
+        echo "Error: BLAST file was not created successfully. Please check the input files and parameters."
+        exit 1
+    fi
+
 else
     echo "BLAST file ${mapped_folder}/${filename}-GD.blast.gz already exists, skipping BLAST."
 fi
 
-# check if the blast file was created successfully
-if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
-    echo "Error: BLAST file was not created successfully. Please check the input files and parameters."
-    exit 1
-fi
 
 # Check if the blast file is empty
 if [[ -z "$(zcat "${mapped_folder}/${filename}-GD.blast.gz" | head -c1)" ]]; then
@@ -257,10 +259,10 @@ if [[ -z "$(zcat "${mapped_folder}/${filename}-GD.blast.gz" | head -c1)" ]]; the
     exit 1
 fi
 
- echo "Extracting non-repetitive sequences from ${mapped_folder}/${filename}-GD.blast.gz"
-
 # get non-rep fasta if it does not exist
 if [[ ! -f "${mapped_folder}/${filename}-GD-non_rep.fasta" ]]; then
+
+    echo "Extracting non-repetitive sequences from ${mapped_folder}/${filename}-GD.blast.gz"
 
     mkdir "${mapped_folder}/${filename}-GD-clusters/"
     python "$current_dir/scripts/blast2clusters.py" "${mapped_folder}/${filename}-GD.blast.gz" "${mapped_folder}/${filename}-GD.fasta" "${mapped_folder}/${filename}-GD-clusters/"
@@ -367,9 +369,31 @@ if [[ "$refine_set" -eq 1 ]]; then
     bash "$current_dir/scripts/find-coupled-clusters.sh" "${mapped_folder}/${filename}-GD-clusters" "${mapped_folder}/${filename}-GD-clusters-refined" "${refine_d}" "${assembly}" "${bam}" "${mapped_folder}/${filename}.bedgraph.gz" "${prefix}"
 fi
 
-mv "${mapped_folder}/${filename}-GD-credibility.bed" "${mapped_folder}/${filename}-GD.bed"
-mv "${mapped_folder}/${filename}.fai" "${mapped_folder}/${filename}-GD.fai"
-mv "${mapped_folder}/${filename}-GD.blast.sorted.gz" "${mapped_folder}/${filename}-GD.blast.gz"
+# These mv steps consume files produced by earlier stages that are skipped on
+# a rerun if their downstream marker file already exists (e.g. after deleting
+# some but not all output files to force a partial rerun). If a prior run
+# already completed the rename, the source is gone and the target already
+# holds the renamed content, so treat that as done rather than erroring.
+if [[ -f "${mapped_folder}/${filename}-GD-credibility.bed" ]]; then
+    mv "${mapped_folder}/${filename}-GD-credibility.bed" "${mapped_folder}/${filename}-GD.bed"
+elif [[ ! -f "${mapped_folder}/${filename}-GD.bed" ]]; then
+    echo "Error: Neither ${filename}-GD-credibility.bed nor ${filename}-GD.bed exists. Please check the input files and parameters."
+    exit 1
+fi
+
+if [[ -f "${mapped_folder}/${filename}.fai" ]]; then
+    mv "${mapped_folder}/${filename}.fai" "${mapped_folder}/${filename}-GD.fai"
+elif [[ ! -f "${mapped_folder}/${filename}-GD.fai" ]]; then
+    echo "Error: Neither ${filename}.fai nor ${filename}-GD.fai exists. Please check the input files and parameters."
+    exit 1
+fi
+
+if [[ -f "${mapped_folder}/${filename}-GD.blast.sorted.gz" ]]; then
+    mv "${mapped_folder}/${filename}-GD.blast.sorted.gz" "${mapped_folder}/${filename}-GD.blast.gz"
+elif [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
+    echo "Error: Neither ${filename}-GD.blast.sorted.gz nor ${filename}-GD.blast.gz exists. Please check the input files and parameters."
+    exit 1
+fi
 
 if [[ "$remove_temp" -eq 1 ]]; then
 
