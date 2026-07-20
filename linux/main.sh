@@ -231,41 +231,41 @@ fi
 echo "Running BLAST to find repetitive gaps in ${mapped_folder}/${filename}-GD.fasta"
 
 # Run blast if blast file does not exist
-if [[ ! -f "${mapped_folder}/${filename}-GD.blast" ]]; then
-    blastn -query "${mapped_folder}/${filename}-GD.fasta" -subject "${mapped_folder}/${filename}-GD.fasta" -out "${mapped_folder}/${filename}-GD.tmp.blast"  -outfmt 6
-    awk '($12) >= '"${min_bitscore}" "${mapped_folder}/${filename}-GD.tmp.blast" > "${mapped_folder}/${filename}-GD.blast"
-    
+if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
+    blastn -query "${mapped_folder}/${filename}-GD.fasta" -subject "${mapped_folder}/${filename}-GD.fasta" -outfmt 6 | gzip > "${mapped_folder}/${filename}-GD.tmp.blast.gz"
+    zcat "${mapped_folder}/${filename}-GD.tmp.blast.gz" | awk '($12) >= '"${min_bitscore}" | gzip > "${mapped_folder}/${filename}-GD.blast.gz"
+
     #remove temporary file
     if [[ "$remove_temp" -eq 1 ]]; then
-        echo "Removing temporary BLAST file ${mapped_folder}/${filename}-GD.tmp.blast"
-        rm "${mapped_folder}/${filename}-GD.tmp.blast"
+        echo "Removing temporary BLAST file ${mapped_folder}/${filename}-GD.tmp.blast.gz"
+        rm "${mapped_folder}/${filename}-GD.tmp.blast.gz"
     fi
-    
+
 else
-    echo "BLAST file ${mapped_folder}/${filename}-GD.blast already exists, skipping BLAST."
+    echo "BLAST file ${mapped_folder}/${filename}-GD.blast.gz already exists, skipping BLAST."
 fi
 
 # check if the blast file was created successfully
-if [[ ! -f "${mapped_folder}/${filename}-GD.blast" ]]; then
+if [[ ! -f "${mapped_folder}/${filename}-GD.blast.gz" ]]; then
     echo "Error: BLAST file was not created successfully. Please check the input files and parameters."
     exit 1
 fi
 
 # Check if the blast file is empty
-if [[ ! -s "${mapped_folder}/${filename}-GD.blast" ]]; then
-    echo "The file ${mapped_folder}/${filename}-GD.blast is empty. GenomeDelta was not able to identify any repetitive gaps in FASTA file. Check if you prepared everything according to the Manual. Try to change the parameters to reduce stringency"
+if [[ -z "$(zcat "${mapped_folder}/${filename}-GD.blast.gz" | head -c1)" ]]; then
+    echo "The file ${mapped_folder}/${filename}-GD.blast.gz is empty. GenomeDelta was not able to identify any repetitive gaps in FASTA file. Check if you prepared everything according to the Manual. Try to change the parameters to reduce stringency"
     exit 1
 fi
 
- echo "Extracting non-repetitive sequences from ${mapped_folder}/${filename}-GD.blast"
+ echo "Extracting non-repetitive sequences from ${mapped_folder}/${filename}-GD.blast.gz"
 
 # get non-rep fasta if it does not exist
 if [[ ! -f "${mapped_folder}/${filename}-GD-non_rep.fasta" ]]; then
-    
+
     mkdir "${mapped_folder}/${filename}-GD-clusters/"
-    python "$current_dir/scripts/blast2clusters.py" "${mapped_folder}/${filename}-GD.blast" "${mapped_folder}/${filename}-GD.fasta" "${mapped_folder}/${filename}-GD-clusters/"
+    python "$current_dir/scripts/blast2clusters.py" "${mapped_folder}/${filename}-GD.blast.gz" "${mapped_folder}/${filename}-GD.fasta" "${mapped_folder}/${filename}-GD-clusters/"
     mv "${mapped_folder}/${filename}-GD-clusters/non_rep.fasta" "${mapped_folder}/${filename}-GD-non_rep.fasta"
-    
+
 else
     echo "Non-repetitive fasta file ${mapped_folder}/${filename}-GD-non_rep.fasta already exists, skipping extraction."
 fi
@@ -364,12 +364,12 @@ done
 if [[ "$refine_set" -eq 1 ]]; then
     echo "Refining..."
     mkdir "${mapped_folder}/${filename}-GD-clusters-refined"
-    bash "$current_dir/scripts/find-coupled-clusters.sh" "${mapped_folder}/${filename}-GD-clusters" "${mapped_folder}/${filename}-GD-clusters-refined" "${refine_d}" "${assembly}" "${bam}" "${mapped_folder}/${filename}.bedgraph" "${prefix}"
+    bash "$current_dir/scripts/find-coupled-clusters.sh" "${mapped_folder}/${filename}-GD-clusters" "${mapped_folder}/${filename}-GD-clusters-refined" "${refine_d}" "${assembly}" "${bam}" "${mapped_folder}/${filename}.bedgraph.gz" "${prefix}"
 fi
 
 mv "${mapped_folder}/${filename}-GD-credibility.bed" "${mapped_folder}/${filename}-GD.bed"
 mv "${mapped_folder}/${filename}.fai" "${mapped_folder}/${filename}-GD.fai"
-mv "${mapped_folder}/${filename}-GD.blast.sorted" "${mapped_folder}/${filename}-GD.blast"
+mv "${mapped_folder}/${filename}-GD.blast.sorted.gz" "${mapped_folder}/${filename}-GD.blast.gz"
 
 if [[ "$remove_temp" -eq 1 ]]; then
 
@@ -377,11 +377,11 @@ if [[ "$remove_temp" -eq 1 ]]; then
 
     rm "${mapped_folder}/${filename}-flanking.bed"
     rm "${mapped_folder}/${filename}.sorted.bam.bai"
-    rm "${mapped_folder}/${filename}-GD.blast"
+    rm "${mapped_folder}/${filename}-GD.blast.gz"
     rm "${mapped_folder}/${filename}-flanking.bedgraph"
     rm "${mapped_folder}/${filename}-GD-flanking.credibility"
     rm "${mapped_folder}/${filename}-GD.fasta-e"
-    rm "${mapped_folder}/${filename}.bedgraph"
+    rm "${mapped_folder}/${filename}.bedgraph.gz"
 fi
 
 echo "Concatenating consensus sequences into ${mapped_folder}/${filename}-GD-candidates.fasta"

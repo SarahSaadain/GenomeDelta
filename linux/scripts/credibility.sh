@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Check if correct number of arguments is provided
 if [ "$#" -ne 6 ]; then
-    echo "Usage: $0 <bed> <bedgraph> <bam> <fasta_genome> <output_folder> <prefix>"
+    echo "Usage: $0 <bed> <bedgraph.gz> <bam> <fasta_genome> <output_folder> <prefix>"
     exit 1
 fi
 
@@ -32,6 +32,6 @@ bedtools sort -faidx "$output_folder/${filename}.fai" -i - > "$output_folder/${f
 bedtools coverage -sorted -a "$output_folder/${filename}-flanking.bed" -b "$bam" -mean -g "$output_folder/${filename}.fai" > "$output_folder/${filename}-flanking.bedgraph"
 
 # Calculate mean coverage of the whole genome
-mean_coverage_whole_genome=$(awk '{ total += $3; count++ } END { if(count > 0) print total/count }' "$bedgraph")
+mean_coverage_whole_genome=$(zcat "$bedgraph" | awk '{ total += $3; count++ } END { if(count > 0) print total/count }')
 
 awk -v mean="$mean_coverage_whole_genome" "{ \$5 = 2 * (\$4 / (\$4 + mean)) - 1; print }" "$output_folder/${filename}-flanking.bedgraph" > "$output_folder/${filename}-GD-flanking.credibility"

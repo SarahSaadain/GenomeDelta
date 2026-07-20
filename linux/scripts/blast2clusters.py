@@ -1,26 +1,32 @@
 import argparse
+import gzip
 import os
 from collections import Counter
 import csv
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Find clusters in BLAST matrix.")
-parser.add_argument("blast", help="Path to blast file")
+parser.add_argument("blast", help="Path to blast file (gzip-compressed if it ends in .gz)")
 parser.add_argument("fasta", help="Path to fasta file")
 parser.add_argument("output", help="Path to the output folder")
 args = parser.parse_args()
+
+def open_maybe_gzip(path, mode, newline=None):
+    if path.endswith(".gz"):
+        return gzip.open(path, mode + "t", newline=newline)
+    return open(path, mode, newline=newline)
 
 '''
 
 '''
 def sort_blast(input_file, output_file):
-    with open(input_file, 'r', newline='') as csvfile:
+    with open_maybe_gzip(input_file, 'r', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t')
         data = list(reader)
-    
+
     sorted_data = sorted(data, key=lambda x: x[0])  # Sort by the first column
-    
-    with open(output_file, 'w', newline='') as csvfile:
+
+    with open_maybe_gzip(output_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
         writer.writerows(sorted_data)
 
@@ -29,7 +35,7 @@ def find_clusters(blast):
     query = ""
     subject = ""
     clusters = [[]]
-    with open(blast, 'r') as blast_file:
+    with open_maybe_gzip(blast, 'r') as blast_file:
         for line in blast_file:
             if query == "":
                 query = line.split("\t")[0]
@@ -94,8 +100,13 @@ def check_len(fasta):
                     discarded.append(seq)
     return saved, discarded
 
-sort_blast(args.blast, args.blast+".sorted")
-clusters = find_clusters(args.blast+".sorted")
+if args.blast.endswith(".gz"):
+    sorted_blast = args.blast[:-len(".gz")] + ".sorted.gz"
+else:
+    sorted_blast = args.blast + ".sorted"
+
+sort_blast(args.blast, sorted_blast)
+clusters = find_clusters(sorted_blast)
 non_repetitive = []
 for i, cluster in enumerate(clusters):
     if len(cluster) > 2:

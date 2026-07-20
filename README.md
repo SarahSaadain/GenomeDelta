@@ -133,7 +133,7 @@ can be resumed by calling the same command again.
    (`scripts/credibility.sh` + `credibility.py`), then extracts the
    sequences into `GD.fasta`. Single-threaded.
 4. **Self-BLAST** (`blastn`) of `GD.fasta` against itself to find repetitive
-   sequences → `GD.blast`. Single-threaded.
+   sequences → `GD.blast.gz`. Single-threaded.
 5. **Clustering** (`scripts/blast2clusters.py`) — groups the BLAST hits into
    repetitive clusters (one `.fasta` file per cluster in `GD-clusters/`) and
    separates out `GD-non_rep.fasta`. Single-threaded.
@@ -253,9 +253,9 @@ header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
 - `GD-non_rep.png` -\> Visualization of the non repetitive gaps found
   (candidate HTs).
 
-- `GD.blast` -\> Output of the self BLAST of `GD.fasta` against itself.
-  This file is then used by the program to find the repetitive clusters
-  of sequences.
+- `GD.blast.gz` -\> Output of the self BLAST of `GD.fasta` against itself,
+  gzip-compressed since it can get very large. This file is then used by
+  the program to find the repetitive clusters of sequences.
 
 - `GD-clusters` -\> This folder contains, for each of the repetitive
   clusters found:

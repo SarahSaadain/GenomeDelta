@@ -22,11 +22,11 @@ mkdir -p "$output_folder"
 # Extract the file name from the prefix
 filename="$prefix"
 
-# Run samtools depth
-samtools depth -a "$input_bam" > "$output_folder/${filename}.bedgraph"
+# Run samtools depth (gzipped, this file can get very large)
+samtools depth -a "$input_bam" | gzip > "$output_folder/${filename}.bedgraph.gz"
 
 # Filter for low coverage
-awk '$3 < '$min_cov "$output_folder/${filename}.bedgraph" > "$output_folder/${filename}-low_coverage.bedgraph"
+zcat "$output_folder/${filename}.bedgraph.gz" | awk '$3 < '$min_cov > "$output_folder/${filename}-low_coverage.bedgraph"
 
 # Create low coverage TSV
 awk 'BEGIN{FS=OFS="\t"} {print $1, $2, $2}' "$output_folder/${filename}-low_coverage.bedgraph" > "$output_folder/${filename}-low_coverage.bed"
@@ -44,7 +44,7 @@ awk '($3 - $2) >= '$min_len "$output_folder/${filename}-low_coverage_merged.bed"
 # Assign credibility to each sequence based on genomic context coverage
 current_dir=$(dirname "$(readlink -f "$0")")
 echo "Calculating coverage support for each gap"
-bash "$current_dir/credibility.sh" "$output_folder/${filename}-GD.bed" "$output_folder/${filename}.bedgraph" "$input_bam" "$assembly" "$output_folder" "$prefix"
+bash "$current_dir/credibility.sh" "$output_folder/${filename}-GD.bed" "$output_folder/${filename}.bedgraph.gz" "$input_bam" "$assembly" "$output_folder" "$prefix"
 python "$current_dir/credibility.py" "$output_folder/${filename}-GD.bed" "$output_folder/${filename}-GD-flanking.credibility" "$output_folder/${filename}.fai"
 
 # Use a loop to process each line in the BED file and get the corresponding cred_value
