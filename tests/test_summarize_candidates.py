@@ -52,7 +52,7 @@ def test_lists_original_regions_for_each_candidate(tmp_path, run_script):
     rows = read_rows(output)
     assert len(rows) == 1
     row = rows[0]
-    assert row["candidate_id"] == "cluster_1.consensus_0.15_3"
+    assert row["candidate_id"] == "cluster_1"
     assert row["credibility"] == "0.15"
     assert row["n_sequences"] == "3"
     assert row["consensus_stripped_length"] == "4"
@@ -104,7 +104,33 @@ def test_one_row_per_candidate_across_multiple_clusters(tmp_path, run_script):
     assert result.returncode == 0, result.stderr
     rows = read_rows(output)
     candidate_ids = {row["candidate_id"] for row in rows}
-    assert candidate_ids == {"cluster_1.consensus_0.0_2", "cluster_2.consensus_0.2_2"}
+    assert candidate_ids == {"cluster_1", "cluster_2"}
+
+
+def test_rows_are_sorted_numerically_by_cluster_id(tmp_path, run_script):
+    clusters = tmp_path / "GD-clusters"
+    clusters.mkdir()
+    write_cluster(
+        clusters,
+        "cluster_10021",
+        [("chr1:1-100_0.0", "AAAA")],
+        "cluster_10021.consensus_-0.17_3",
+        "AAAA",
+    )
+    write_cluster(
+        clusters,
+        "cluster_2",
+        [("chr3:1-100_0.3", "TTTT")],
+        "cluster_2.consensus_0.2_2",
+        "TTTT",
+    )
+    output = tmp_path / "summary.tsv"
+
+    result = run_script("summarize_candidates.py", [clusters, output])
+
+    assert result.returncode == 0, result.stderr
+    rows = read_rows(output)
+    assert [row["candidate_id"] for row in rows] == ["cluster_2", "cluster_10021"]
 
 
 def test_merges_multiple_cluster_folders(tmp_path, run_script):
@@ -133,7 +159,7 @@ def test_merges_multiple_cluster_folders(tmp_path, run_script):
     assert result.returncode == 0, result.stderr
     rows = read_rows(output)
     candidate_ids = {row["candidate_id"] for row in rows}
-    assert candidate_ids == {"cluster_1.consensus_0.0_1", "cluster_1_2.consensus_0.4_1"}
+    assert candidate_ids == {"cluster_1", "cluster_1_2"}
 
 
 def test_missing_raw_fasta_yields_empty_regions(tmp_path, run_script):

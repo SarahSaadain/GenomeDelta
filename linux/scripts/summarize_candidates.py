@@ -2,6 +2,7 @@ import argparse
 import csv
 import glob
 import os
+import re
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(
@@ -48,6 +49,11 @@ def parse_region(header):
     return region, credibility
 
 
+def natural_sort_key(candidate_id):
+    """Sort cluster ids numerically (cluster_2 before cluster_10021)."""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", candidate_id)]
+
+
 rows = []
 for folder in args.clusters_folder:
     if not os.path.isdir(folder):
@@ -59,8 +65,11 @@ for folder in args.clusters_folder:
         candidate_headers = read_fasta_headers(consensus_path)
         if not candidate_headers:
             continue
-        candidate_id = candidate_headers[0]
-        _, credibility, _ = candidate_id.rsplit("_", 2) if candidate_id.count("_") >= 2 else (candidate_id, "", "")
+        consensus_header = candidate_headers[0]
+        _, credibility, _ = (
+            consensus_header.rsplit("_", 2) if consensus_header.count("_") >= 2 else (consensus_header, "", "")
+        )
+        candidate_id = os.path.basename(consensus_path)[: -len(".consensus")]
 
         member_headers = read_fasta_headers(raw_fasta_path) if os.path.isfile(raw_fasta_path) else []
         regions = [parse_region(h)[0] for h in member_headers]
@@ -80,6 +89,8 @@ for folder in args.clusters_folder:
                 "original_regions": ";".join(regions),
             }
         )
+
+rows.sort(key=lambda row: natural_sort_key(row["candidate_id"]))
 
 with open(args.output, "w", newline="") as out_file:
     writer = csv.DictWriter(
