@@ -299,11 +299,27 @@ header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
 
   These `-` gap columns are kept in `.consensus.raw`, but stripped out
   of the final `.consensus` file (and therefore out of
-  `GD-candidates.fasta`): `-` isn't a valid nucleotide character, and
-  leaving it in would both break tools that consume the candidates
-  file downstream (BLAST, RepeatMasker, aligners, ...) and inflate the
-  "consensus length" reported by `samtools faidx`/`visualization.R`
-  with columns that don't represent any real sequence.
+  `GD-candidates.fasta`). Removing them makes sense because a gap
+  column is an artifact of the alignment, not real sequence:
+
+  - **`-` is not a nucleotide.** It marks "no base was aligned here",
+    not an A/T/G/C call. Leaving it in the candidate sequence would
+    misrepresent the consensus as containing an actual base at that
+    position.
+  - **Downstream tools expect plain sequence.** BLAST, RepeatMasker,
+    aligners, etc. consuming `GD-candidates.fasta` expect a
+    contiguous, valid nucleotide string; stray `-` characters can be
+    rejected or silently mishandled.
+  - **It keeps length-based metrics honest.** `samtools faidx` and
+    `visualization.R` report "consensus length" by counting
+    characters. Padding columns inflate that count without adding any
+    real sequence, making short, poorly-covered clusters look longer
+    (and possibly more credible) than they are.
+  - **No information is lost.** Since a gap column by definition
+    means most sequences in the cluster don't cover that position,
+    stripping it just removes columns that were never real sequence
+    to begin with — and the ungapped `.consensus.raw` is kept
+    alongside for anyone who wants to inspect the original alignment.
 
 ## Tips & Tricks
 

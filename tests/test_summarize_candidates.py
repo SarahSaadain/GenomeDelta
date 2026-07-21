@@ -11,13 +11,16 @@ aren't lost once everything is concatenated into GD-candidates.fasta.
 import csv
 
 
-def write_cluster(folder, name, members, consensus_header, consensus_seq):
+def write_cluster(folder, name, members, consensus_header, consensus_seq, consensus_raw_seq=None):
     fasta = folder / f"{name}.fasta"
     fasta.write_text(
         "".join(f">{header}\n{seq}\n" for header, seq in members)
     )
     consensus = folder / f"{name}.consensus"
     consensus.write_text(f">{consensus_header}\n{consensus_seq}\n")
+    if consensus_raw_seq is not None:
+        consensus_raw = folder / f"{name}.consensus.raw"
+        consensus_raw.write_text(f">{consensus_header}\n{consensus_raw_seq}\n")
     return fasta, consensus
 
 
@@ -39,6 +42,7 @@ def test_lists_original_regions_for_each_candidate(tmp_path, run_script):
         ],
         "cluster_1.consensus_0.15_3",
         "ACGT",
+        consensus_raw_seq="AC--GT",
     )
     output = tmp_path / "summary.tsv"
 
@@ -51,8 +55,29 @@ def test_lists_original_regions_for_each_candidate(tmp_path, run_script):
     assert row["candidate_id"] == "cluster_1.consensus_0.15_3"
     assert row["credibility"] == "0.15"
     assert row["n_sequences"] == "3"
-    assert row["consensus_length"] == "4"
+    assert row["consensus_stripped_length"] == "4"
+    assert row["consensus_raw_length"] == "6"
     assert row["original_regions"] == "chr1:1000-2000;chr1:5000-6000;chr2:100-300"
+
+
+def test_missing_raw_consensus_file_yields_empty_raw_length(tmp_path, run_script):
+    clusters = tmp_path / "GD-clusters"
+    clusters.mkdir()
+    write_cluster(
+        clusters,
+        "cluster_1",
+        [("chr1:1000-2000_0.1", "ACGT")],
+        "cluster_1.consensus_0.1_1",
+        "ACGT",
+    )
+    output = tmp_path / "summary.tsv"
+
+    result = run_script("summarize_candidates.py", [clusters, output])
+
+    assert result.returncode == 0, result.stderr
+    row = read_rows(output)[0]
+    assert row["consensus_stripped_length"] == "4"
+    assert row["consensus_raw_length"] == ""
 
 
 def test_one_row_per_candidate_across_multiple_clusters(tmp_path, run_script):

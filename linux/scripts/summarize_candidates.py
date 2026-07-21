@@ -54,6 +54,7 @@ for folder in args.clusters_folder:
         continue
     for consensus_path in sorted(glob.glob(os.path.join(folder, "*.consensus"))):
         raw_fasta_path = consensus_path[: -len(".consensus")] + ".fasta"
+        consensus_raw_path = consensus_path + ".raw"
 
         candidate_headers = read_fasta_headers(consensus_path)
         if not candidate_headers:
@@ -70,7 +71,12 @@ for folder in args.clusters_folder:
                 "cluster_file": os.path.basename(raw_fasta_path),
                 "credibility": credibility,
                 "n_sequences": len(regions),
-                "consensus_length": read_fasta_sequence_length(consensus_path),
+                "consensus_stripped_length": read_fasta_sequence_length(consensus_path),
+                "consensus_raw_length": (
+                    read_fasta_sequence_length(consensus_raw_path)
+                    if os.path.isfile(consensus_raw_path)
+                    else ""
+                ),
                 "original_regions": ";".join(regions),
             }
         )
@@ -83,7 +89,8 @@ with open(args.output, "w", newline="") as out_file:
             "cluster_file",
             "credibility",
             "n_sequences",
-            "consensus_length",
+            "consensus_stripped_length",
+            "consensus_raw_length",
             "original_regions",
         ],
         delimiter="\t",
