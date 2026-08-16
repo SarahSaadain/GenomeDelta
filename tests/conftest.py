@@ -44,3 +44,20 @@ def run_bash():
 @pytest.fixture
 def main_sh():
     return MAIN_SH
+
+
+def _run_r_script(name, args, cwd=None):
+    """Run one of the linux/scripts/*.R CLI scripts via Rscript as a subprocess."""
+    script = SCRIPTS_DIR / name
+    return subprocess.run(
+        ["Rscript", str(script), *[str(a) for a in args]],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.fixture
+def run_r():
+    """Run a script in linux/scripts/ via Rscript, e.g. run_r('visualization.R', [...])."""
+    return _run_r_script

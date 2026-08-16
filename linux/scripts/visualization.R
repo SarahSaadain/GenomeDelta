@@ -20,7 +20,7 @@ candidates <- read_tsv(args$rep, show_col_types = FALSE, col_names = c("all", "b
 
 # Read the input file2
 non_rep <- read_tsv(args$nonrep, show_col_types = FALSE, col_names = c("all", "bp", "x", "y", "z")) %>%
-  select(-x, -y, -z) %>% separate(all, into = c("cluster","credibility"), sep="_") %>% type_convert()
+  select(-x, -y, -z) %>% separate(all, into = c("cluster","credibility"), sep="_(?=[^_]*$)") %>% type_convert()
   
 #print(candidates)
 #print(non_rep)
