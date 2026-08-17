@@ -41,7 +41,7 @@ def extract_credibility(interval, cred):
         for line in credibility_file:
             if (line.split(' ')[0]==interval[0]) and (line.split(' ')[1]==interval[1]) and (line.split(' ')[2]==interval[2]):
                 credy = line.split(' ')[4].replace(',', '.')
-                print(credy)
+                #print(credy)
                 credibility = round(float(credy),3)
     return credibility
 
