@@ -257,7 +257,12 @@ header (e.g. `cluster_23.consensus_-0.74_4` -\> mean credibility
   (default = 100 bases).
 
 - `GD.bed` -\> Chromosome, starting and ending positions of the
-  sequences collected in `GD.fasta`.
+  sequences collected in `GD.fasta`, followed by the sequence name,
+  its credibility score, and the number of raw low-coverage gaps that
+  were bridged together (within `--d`) to form that region. A value of
+  `1` means the region was already contiguous below `--min_cov`; higher
+  values mean multiple separate low-coverage stretches were merged
+  because they were closer than `--d` apart, i.e. a patchier gap.
 
 - `GD-non_rep.fasta` -\> Subset of the `GD.fasta` file containing only
   sequences which were not included in the repetitive clusters, so
