@@ -54,8 +54,12 @@ echo "Calculating coverage support for each gap"
 bash "$current_dir/credibility.sh" "$output_folder/${filename}-GD.bed" "$output_folder/${filename}.bedgraph.gz" "$input_bam" "$assembly" "$output_folder" "$prefix"
 python "$current_dir/credibility.py" "$output_folder/${filename}-GD.bed" "$output_folder/${filename}-GD-flanking.credibility" "$output_folder/${filename}.fai"
 
-# Append the number of raw gaps merged into each region (patchiness) as the last column
-paste "$output_folder/${filename}-GD-credibility.bed" <(cut -f4 "$output_folder/${filename}-GD-with_gap_count.bed") > "$output_folder/${filename}-GD-credibility.tmp.bed"
+# Append the number of raw gaps merged into each region (patchiness) as the
+# last column, and also bake it onto the name field (col 4) so it survives
+# into the fasta header via `getfasta -name` and can be tracked per-cluster
+# downstream (MSA2consensus.py, summarize_candidates.py).
+paste "$output_folder/${filename}-GD-credibility.bed" <(cut -f4 "$output_folder/${filename}-GD-with_gap_count.bed") \
+    | awk 'BEGIN{FS=OFS="\t"} {$4=$4"_"$6} 1' > "$output_folder/${filename}-GD-credibility.tmp.bed"
 mv "$output_folder/${filename}-GD-credibility.tmp.bed" "$output_folder/${filename}-GD-credibility.bed"
 
 # Use a loop to process each line in the BED file and get the corresponding cred_value

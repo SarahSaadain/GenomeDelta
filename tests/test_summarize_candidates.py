@@ -60,6 +60,51 @@ def test_lists_original_regions_for_each_candidate(tmp_path, run_script):
     assert row["original_regions"] == "chr1:1000-2000;chr1:5000-6000;chr2:100-300"
 
 
+def test_lists_gap_count_average_and_individual_values(tmp_path, run_script):
+    clusters = tmp_path / "GD-clusters"
+    clusters.mkdir()
+    write_cluster(
+        clusters,
+        "cluster_1",
+        [
+            ("chr1:1000-2000_0.1_2", "ACGT"),
+            ("chr1:5000-6000_0.2_4", "ACGT"),
+        ],
+        "cluster_1.consensus_0.15_2_3.0",
+        "ACGT",
+    )
+    output = tmp_path / "summary.tsv"
+
+    result = run_script("summarize_candidates.py", [clusters, output])
+
+    assert result.returncode == 0, result.stderr
+    row = read_rows(output)[0]
+    assert row["credibility"] == "0.15"
+    assert row["avg_gap_count"] == "3.0"
+    assert row["gap_values"] == "2;4"
+
+
+def test_legacy_members_without_gap_count_yield_empty_gap_fields(tmp_path, run_script):
+    clusters = tmp_path / "GD-clusters"
+    clusters.mkdir()
+    write_cluster(
+        clusters,
+        "cluster_1",
+        [("chr1:1000-2000_0.1", "ACGT")],
+        "cluster_1.consensus_0.1_1",
+        "ACGT",
+    )
+    output = tmp_path / "summary.tsv"
+
+    result = run_script("summarize_candidates.py", [clusters, output])
+
+    assert result.returncode == 0, result.stderr
+    row = read_rows(output)[0]
+    assert row["avg_gap_count"] == ""
+    assert row["gap_values"] == ""
+    assert row["original_regions"] == "chr1:1000-2000"
+
+
 def test_missing_raw_consensus_file_yields_empty_raw_length(tmp_path, run_script):
     clusters = tmp_path / "GD-clusters"
     clusters.mkdir()

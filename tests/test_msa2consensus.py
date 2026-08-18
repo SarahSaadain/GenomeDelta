@@ -38,6 +38,37 @@ def test_majority_vote_picks_the_most_common_base(tmp_path, run_script):
     assert header == f">{output.name}_0.2_3"
 
 
+def test_gap_count_is_averaged_and_appended_to_the_header(tmp_path, run_script):
+    msa = tmp_path / "cluster.MSA"
+    msa.write_text(
+        ">chr1:1-100_0.10_2\n"
+        "ACGT\n"
+        ">chr1:200-300_0.20_4\n"
+        "ACGT\n"
+    )
+    output = tmp_path / "cluster.consensus"
+
+    result = run_script("MSA2consensus.py", [msa, output])
+
+    assert result.returncode == 0, result.stderr
+    header, seq = read_fasta_record(output)
+    assert seq == "ACGT"
+    # mean(0.10, 0.20) = 0.15; mean(2, 4) = 3.0
+    assert header == f">{output.name}_0.15_2_3.0"
+
+
+def test_legacy_headers_without_gap_count_omit_it_from_the_header(tmp_path, run_script):
+    msa = tmp_path / "cluster.MSA"
+    msa.write_text(">chr1:1-100_0.10\nACGT\n>chr1:200-300_0.20\nACGT\n")
+    output = tmp_path / "cluster.consensus"
+
+    result = run_script("MSA2consensus.py", [msa, output])
+
+    assert result.returncode == 0, result.stderr
+    header, _ = read_fasta_record(output)
+    assert header == f">{output.name}_0.15_2"
+
+
 def test_defragments_wrapped_multiline_sequences(tmp_path, run_script):
     msa = tmp_path / "wrapped.MSA"
     msa.write_text(

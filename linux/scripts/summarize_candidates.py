@@ -42,11 +42,43 @@ def read_fasta_sequence_length(path):
 
 
 def parse_region(header):
-    """Split a "chr:start-end_credibility" member header into (region, credibility)."""
-    region, _, credibility = header.rpartition("_")
+    """Split a "chr:start-end_credibility[_gap_count]" member header into
+    (region, credibility, gap_count).
+
+    Older headers (e.g. from the --refine path) lack the gap_count segment.
+    credibility is always a rounded float (so its string always has a "."),
+    while gap_count is a plain integer, which is what tells the two formats
+    apart.
+    """
+    region, _, last = header.rpartition("_")
     if not region:
-        return header, ""
-    return region, credibility
+        return header, "", ""
+    if "." not in last:
+        gap_count = last
+        region, _, credibility = region.rpartition("_")
+        if not region:
+            return header, "", ""
+        return region, credibility, gap_count
+    return region, last, ""
+
+
+def parse_consensus_header(header):
+    """Split a "name_credibility_n[_avg_gap_count]" consensus header into
+    (credibility, avg_gap_count), mirroring parse_region's dot heuristic
+    (n is a plain integer; credibility/avg_gap_count are rounded floats).
+    """
+    front, _, last = header.rpartition("_")
+    if not front:
+        return "", ""
+    if "." in last:
+        avg_gap_count = last
+        front, _, _n = front.rpartition("_")
+    else:
+        avg_gap_count = ""
+    name, _, credibility = front.rpartition("_")
+    if not name:
+        return "", ""
+    return credibility, avg_gap_count
 
 
 def natural_sort_key(candidate_id):
@@ -66,19 +98,20 @@ for folder in args.clusters_folder:
         if not candidate_headers:
             continue
         consensus_header = candidate_headers[0]
-        _, credibility, _ = (
-            consensus_header.rsplit("_", 2) if consensus_header.count("_") >= 2 else (consensus_header, "", "")
-        )
+        credibility, avg_gap_count = parse_consensus_header(consensus_header)
         candidate_id = os.path.basename(consensus_path)[: -len(".consensus")]
 
         member_headers = read_fasta_headers(raw_fasta_path) if os.path.isfile(raw_fasta_path) else []
-        regions = [parse_region(h)[0] for h in member_headers]
+        members = [parse_region(h) for h in member_headers]
+        regions = [region for region, _, _ in members]
+        gap_values = [gap_count for _, _, gap_count in members]
 
         rows.append(
             {
                 "candidate_id": candidate_id,
                 "cluster_file": os.path.basename(raw_fasta_path),
                 "credibility": credibility,
+                "avg_gap_count": avg_gap_count,
                 "n_sequences": len(regions),
                 "consensus_stripped_length": read_fasta_sequence_length(consensus_path),
                 "consensus_raw_length": (
@@ -87,6 +120,7 @@ for folder in args.clusters_folder:
                     else ""
                 ),
                 "original_regions": ";".join(regions),
+                "gap_values": ";".join(gap_values) if all(gap_values) else "",
             }
         )
 
@@ -99,10 +133,12 @@ with open(args.output, "w", newline="") as out_file:
             "candidate_id",
             "cluster_file",
             "credibility",
+            "avg_gap_count",
             "n_sequences",
             "consensus_stripped_length",
             "consensus_raw_length",
             "original_regions",
+            "gap_values",
         ],
         delimiter="\t",
     )

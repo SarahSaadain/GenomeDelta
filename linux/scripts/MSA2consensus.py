@@ -34,9 +34,33 @@ with open(args.output+".def", 'r') as input:
         else:
             sequences[-1].append(line.strip().upper())
 
-cred = [float(h.split('_')[-1]) for h in headers]
+def parse_credibility_and_gap_count(header):
+    """Split a "..._credibility[_gap_count]" member header.
+
+    Older headers (e.g. from the --refine path, which rebuilds its own bed
+    file and doesn't carry gap counts) only have the credibility segment.
+    round(x, N) on a float always stringifies with a ".", while the raw gap
+    count is a plain integer, so that's used to tell the two formats apart.
+    """
+    front, last = header.rsplit('_', 1)
+    if '.' not in last and '_' in front:
+        gap_count = int(last)
+        _, credibility = front.rsplit('_', 1)
+        return float(credibility), gap_count
+    return float(last), None
+
+
+parsed = [parse_credibility_and_gap_count(h) for h in headers]
+cred = [c for c, _ in parsed]
+gap_counts = [g for _, g in parsed if g is not None]
 n = len(headers)
 cluster_credibility = round(statistics.mean(cred), 2)
+avg_gap_count = round(statistics.mean(gap_counts), 2) if gap_counts else None
+# statistics.mean() of ints returns an int when the mean is exact (e.g. 3, not
+# 3.0); force a float so the header field always stringifies with a "." -
+# that's what tells it apart from the plain-int "n" field that follows.
+if avg_gap_count is not None:
+    avg_gap_count = float(avg_gap_count)
 
 sequences = [''.join(seq_lines) for seq_lines in sequences]
 sequence_length = len(sequences[0])
@@ -82,7 +106,10 @@ for base in range(sequence_length):
         else:
             consensus.append("-")
 
-header = ">" + input_basename + "_" + str(cluster_credibility) + "_" + str(n) + "\n"
+header = ">" + input_basename + "_" + str(cluster_credibility) + "_" + str(n)
+if avg_gap_count is not None:
+    header += "_" + str(avg_gap_count)
+header += "\n"
 consensus_raw = ''.join(consensus)
 
 # Raw consensus keeps the gap columns ("-"), so the alignment structure
